@@ -1,0 +1,190 @@
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import gc
+from lightgbm import LGBMClassifier
+from sklearn.metrics import log_loss
+from sklearn.model_selection import KFold, StratifiedKFold
+import seaborn as sns
+import re
+import nltk
+from nltk.corpus import stopwords
+from nltk.stem import SnowballStemmer
+from string import punctuation
+
+#read the testing and training data
+train_feature = pd.read_csv('train_data.csv')
+train_target = pd.read_csv('train_label.csv')
+test = pd.read_csv('test_data.csv')
+train = train_feature.join(train_target['score'],how = 'left')
+
+print('The size of training data is:' ,train.shape)
+print('The size of testing data is:' ,test.shape)
+
+# Function to calculate missing values by column
+def missing_values_table(df):
+        # Total missing values
+        mis_val = df.isnull().sum()
+        
+        # Percentage of missing values
+        mis_val_percent = 100 * df.isnull().sum() / len(df)
+
+        # Make a table with the results
+        mis_val_table = pd.concat([mis_val, mis_val_percent], axis=1)
+        
+        # Rename the columns
+        mis_val_table_ren_columns = mis_val_table.rename(
+        columns = {0 : 'Missing Values', 1 : '% of Total Values'})
+        
+        # Sort the table by percentage of missing descending
+        mis_val_table_ren_columns = mis_val_table_ren_columns[
+            mis_val_table_ren_columns.iloc[:,1] != 0].sort_values(
+        '% of Total Values', ascending=False).round(1)
+        
+        # Print some summary information
+        print ("Your selected dataframe has " + str(df.shape[1]) + " columns.\n"      
+            "There are " + str(mis_val_table_ren_columns.shape[0]) +
+              " columns that have missing values.")
+        
+        # Return the dataframe with missing information
+        return mis_val_table_ren_columns
+
+missing_values_table(train)
+missing_values_table(test)
+
+#Extracting word features from the description
+def feature_des():
+    train_des = pd.Series(train['descrption'].tolist()).astype(str)
+    train['des_wordcount'] = train_des.apply(lambda x: len(x.split(' ')))
+    train['des_lettercount'] = train_des.apply(lambda x: len(x))
+    train['des_labelcount'] = train_des.apply(lambda x: len(re.findall('\<li\>', x)))
+    
+    test_des = pd.Series(test['descrption'].tolist()).astype(str)
+    test['des_wordcount'] = test_des.apply(lambda x: len(x.split(' ')))
+    test['des_lettercount'] = test_des.apply(lambda x: len(x))
+    test['des_labelcount'] = test_des.apply(lambda x: len(re.findall('\<li\>', x)))
+
+feature_des()
+
+#Extracting word count weights
+stop_words = ['the','a','an','and','but','if','or','because','as','what','which','this','that','these','those','then',
+              'just','so','than','such','both','through','about','for','is','of','while','during','to','What','Which',
+              'Is','If','While','This']
+
+
+
+def text_to_wordlist(text, remove_stop_words=True, stem_words=False):
+    # Clean the text, with the option to remove stop_words and to stem words.
+
+    # Clean the text
+    text = re.sub(r'<ul>', " ", text)
+    text = re.sub(r'</ul>', " ", text)
+    text = re.sub(r'<li>', " ", text)
+    text = re.sub(r'<div>', " ", text)
+    text = re.sub(r'</li>', " ", text)
+    text = re.sub(r'</div>', " ", text)
+    text = re.sub(r'[0-9]'," ", text)
+    text = text.lower()
+    
+    # Remove punctuation from text
+    text = ''.join([c for c in text if c not in punctuation])
+    
+    # Optionally, remove stop words
+    if remove_stop_words:
+        text = text.split()
+        text = [w for w in text if not w in stop_words]
+        text = " ".join(text)
+    
+    # Optionally, shorten words to their stems
+    if stem_words:
+        text = text.split()
+        stemmer = SnowballStemmer('english')
+        stemmed_words = [stemmer.stem(word) for word in text]
+        text = " ".join(stemmed_words)
+    
+    # Return a list of words
+    return(text)
+
+def process_text(question_list, questions, question_list_name, dataframe):
+    '''transform questions and display progress'''
+    for question in questions:
+        question_list.append(text_to_wordlist(question))
+#        if len(question_list) % 100000 == 0:
+#            progress = len(question_list)/len(dataframe) * 100
+#            print("{} is {}% complete.".format(question_list_name, round(progress, 1)))
+
+des_train = train['descrption']
+des_train_list = des_train.astype(str).tolist()
+des_test = test['descrption']
+des_test_list = des_test.astype(str).tolist()
+
+des_new_train = []
+process_text(des_new_train, des_train_list, 'train_question1', train)
+des_new_test = []
+process_text(des_new_test, des_test_list, 'train_question1', train)
+
+from sklearn.feature_extraction.text import TfidfVectorizer
+vectorizer = TfidfVectorizer()
+X1_train = vectorizer.fit_transform(des_new_train)
+X1_test = vectorizer.fit_transform(des_new_test)
+
+#Apply SVD to reduce the dimension of the data
+from sklearn.decomposition import TruncatedSVD
+svd = TruncatedSVD(n_components=10,algorithm='arpack')
+x1_train = svd.fit_transform(X1_train)
+x1_test = svd.fit_transform(X1_test)
+
+col_name = [i for i in range(10)]
+x1_train = pd.DataFrame(x1_train,columns = col_name)
+x1_test =  pd.DataFrame(x1_test,columns = col_name)
+
+
+train_try = train.drop(columns = 'descrption')
+train_try = train_try.join(x1_train,how = 'left')
+test_try = test.drop(columns = 'descrption')
+test_try = test_try.join(x1_test,how = 'left')
+
+#Name features
+name_train = train['name']
+name_train_list = name_train.astype(str).tolist()
+name_test = test['name']
+name_test_list = name_test.astype(str).tolist()
+
+name_new_train = []
+process_text(name_new_train, name_train_list, 'train_question1', train)
+name_new_test = []
+process_text(name_new_test, name_test_list, 'train_question1', train)
+
+from sklearn.feature_extraction.text import TfidfVectorizer
+vectorizer = TfidfVectorizer()
+X2_train = vectorizer.fit_transform(name_new_train)
+X2_test = vectorizer.fit_transform(name_new_test)
+
+#Apply SVD to reduce the dimension of the data
+from sklearn.decomposition import TruncatedSVD
+svd = TruncatedSVD(n_components=30,algorithm='arpack')
+x2_train = svd.fit_transform(X2_train)
+x2_test = svd.fit_transform(X2_test)
+
+col_name = [i for i in range(10,20)]
+x2_train = pd.DataFrame(x2_train,columns = col_name)
+x2_test =  pd.DataFrame(x2_test,columns = col_name)
+
+train_try = train_try.drop(columns = 'name')
+train_try = train_try.join(x2_train,how = 'left')
+test_try = test_try.drop(columns = 'name')
+test_try = test_try.join(x2_test,how = 'left')
+
+def one_hot_encoder(df, nan_as_category = True):
+    original_columns = list(df.columns)
+    categorical_columns = [col for col in df.columns if df[col].dtype == 'object']
+    df = pd.get_dummies(df, columns= categorical_columns, dummy_na= nan_as_category)
+    new_columns = [c for c in df.columns if c not in original_columns]
+    return df, new_columns
+
+#one-hot encoding the columns
+train_try_ohe, new_columns = one_hot_encoder(train_try.drop(columns = ['score']), True)
+train_try_ohe = train_try_ohe.join(train['score'],how = 'left')
+test_try_ohe, new_columns = one_hot_encoder(test_try, True)
+df_try_ohe = train_try_ohe.append(test_try_ohe).reset_index()
+df_try_ohe = df_try_ohe.drop(columns = 'index')
