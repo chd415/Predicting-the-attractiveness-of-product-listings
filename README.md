@@ -1,5 +1,5 @@
 # Predicting-the-attractivenes-of-product-listings-Kaggle-Competition
-[![](./licence/licence.png =125x)](https://www.kaggle.com/c/lehighcse347447)
+[![](./licence/licence.png)](https://www.kaggle.com/c/lehighcse347447)
 
 This is the first Kaggle competition I enerted and this is also Data Mining course final project. I'm pleased my submission scored is #7 out of 50 teams.
 
