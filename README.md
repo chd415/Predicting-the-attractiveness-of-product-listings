@@ -1,6 +1,5 @@
 # Predicting-the-attractivenes-of-product-listings-Kaggle-Competition
-[![](./licence/licence.png)](https://www.kaggle.com/c/lehighcse347447)
-[![Udacity - Self-Driving Car NanoDegree](https://s3.amazonaws.com/udacity-sdc/github/shield-carnd.svg)](http://www.udacity.com/drive)
+[![](./licence/licence.png =125x)](https://www.kaggle.com/c/lehighcse347447)
 
 This is the first Kaggle competition I enerted and this is also Data Mining course final project. I'm pleased my submission scored is #7 out of 50 teams.
 
@@ -19,7 +18,7 @@ This is the first Kaggle competition I enerted and this is also Data Mining cour
 
 ### Methods and algorithms used in this competition
 
-<img src="./licence/flowchart.png" width="480" />
+<img src="./licence/flowchart.png" width="600" />
 
 * pandas
 * CountVectorizer/TfidfVectorizer/HashingVectorizer (sklearn)
