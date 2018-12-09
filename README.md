@@ -18,7 +18,7 @@ This is the first Kaggle competition I enerted and this is also Data Mining cour
 
 ### Methods and algorithms used in this competition
 
-<img src="./licence/flowchart.png" width="600" />
+<img src="./licence/flowchart.png" width="650" />
 
 * pandas
 * CountVectorizer/TfidfVectorizer/HashingVectorizer (sklearn)
